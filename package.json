@@ -1,0 +1,28 @@
+{
+  "name": "com.buichivu.smartfolders",
+  "version": "1.0.0",
+  "displayName": "Smart Folders",
+  "description": "Advanced folder color and organization system for Unity Project Window. Features: color coding, pattern matching, presets, context menus, and automatic theme detection.",
+  "unity": "2020.3",
+  "keywords": [
+    "folder",
+    "color",
+    "organization",
+    "project",
+    "editor",
+    "utility",
+    "visual",
+    "productivity"
+  ],
+  "author": {
+    "name": "Bui Chi Vu",
+    "email": "buivuisme@gmail.com",
+    "url": "https://github.com/buichivu"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:buichivu/SmartFolders.git"
+  },
+  "dependencies": {}
+}
