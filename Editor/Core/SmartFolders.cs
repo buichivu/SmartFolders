@@ -1,92 +1,145 @@
-using UnityEngine;
-using UnityEditor;
-using SmartFolders.Data;
 using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+using SmartFolders.Data;
 
 namespace SmartFolders.Core
 {
+    /// <summary>
+    /// Main system that handles folder coloring in the Unity Project Window.
+    /// </summary>
     [InitializeOnLoad]
-    public static class SmartFolders
+    public static class SmartFoldersSystem
     {
-        private static Dictionary<string, Color> _pathToColor = new Dictionary<string, Color>();
-        private static Dictionary<Color, Texture2D> _colorToTexture = new Dictionary<Color, Texture2D>();
-        private static bool _isEnabled = true;
+        private static FolderColorCollection settings;
+        private static Dictionary<string, Color> pathColorCache = new Dictionary<string, Color>();
+        private static Dictionary<Color, Texture2D> textureCache = new Dictionary<Color, Texture2D>();
 
-        static SmartFolders()
+        static SmartFoldersSystem()
         {
-            ReloadSettings();
             EditorApplication.projectWindowItemOnGUI -= OnProjectWindowItemGUI;
             EditorApplication.projectWindowItemOnGUI += OnProjectWindowItemGUI;
-            Debug.Log("[Smart Folders] Initialized successfully");
+            ReloadSettings();
         }
 
+        /// <summary>
+        /// Reloads the folder color settings from the settings file.
+        /// </summary>
         public static void ReloadSettings()
         {
-            _pathToColor.Clear();
-            
-            var guids = AssetDatabase.FindAssets($"t:{nameof(FolderColorCollection)}");
-            foreach (var guid in guids)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guid);
-                var collection = AssetDatabase.LoadAssetAtPath<FolderColorCollection>(path);
-                
-                if (collection != null && collection.Data != null)
-                {
-                    foreach (var folderColor in collection.Data)
-                    {
-                        if (folderColor.IsValid())
-                        {
-                            _pathToColor[folderColor.Path] = folderColor.Color;
-                        }
-                    }
-                }
-            }
-            
-            Debug.Log($"[Smart Folders] Loaded {_pathToColor.Count} folder colors");
-        }
+            pathColorCache.Clear();
 
-        private static void OnProjectWindowItemGUI(string guid, Rect rect)
-        {
-            if (!_isEnabled) return;
-            
-            var path = AssetDatabase.GUIDToAssetPath(guid);
-            if (!AssetDatabase.IsValidFolder(path)) return;
-            
-            if (_pathToColor.TryGetValue(path, out var color))
+            // Try to find the settings file
+            string[] guids = AssetDatabase.FindAssets("t:FolderColorCollection");
+            if (guids.Length > 0)
             {
-                var texture = GetTexture(color);
-                if (texture != null)
-                {
-                    GUI.DrawTexture(rect, texture);
-                }
+                string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                settings = AssetDatabase.LoadAssetAtPath<FolderColorCollection>(path);
+            }
+            else
+            {
+                settings = null;
             }
         }
 
-        private static Texture2D GetTexture(Color color)
+        /// <summary>
+        /// Gets the current settings instance, creating one if necessary.
+        /// </summary>
+        public static FolderColorCollection GetOrCreateSettings()
         {
-            if (_colorToTexture.TryGetValue(color, out var texture) && texture != null)
+            if (settings == null)
+            {
+                ReloadSettings();
+            }
+
+            if (settings == null)
+            {
+                // Create default settings in Assets folder
+                string settingsPath = "Assets/SmartFoldersSettings.asset";
+                settings = ScriptableObject.CreateInstance<FolderColorCollection>();
+                AssetDatabase.CreateAsset(settings, settingsPath);
+                AssetDatabase.SaveAssets();
+                Debug.Log($"Created Smart Folders settings at {settingsPath}");
+            }
+
+            return settings;
+        }
+
+        private static void OnProjectWindowItemGUI(string guid, Rect selectionRect)
+        {
+            if (settings == null)
+                return;
+
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+
+            // Only process directories
+            if (!AssetDatabase.IsValidFolder(path))
+                return;
+
+            // Get color from cache or calculate it
+            Color? color = GetColorForPath(path);
+            if (!color.HasValue)
+                return;
+
+            // Get or create texture for this color
+            Texture2D colorTexture = GetOrCreateTexture(color.Value);
+
+            // Draw the colored rectangle
+            Rect bgRect = selectionRect;
+            bgRect.x = 0;
+            bgRect.width = selectionRect.x + selectionRect.width + 16;
+
+            GUI.DrawTexture(bgRect, colorTexture);
+        }
+
+        private static Color? GetColorForPath(string path)
+        {
+            if (pathColorCache.TryGetValue(path, out Color cachedColor))
+            {
+                return cachedColor;
+            }
+
+            Color? color = settings.GetColorForPath(path);
+            if (color.HasValue)
+            {
+                pathColorCache[path] = color.Value;
+            }
+
+            return color;
+        }
+
+        private static Texture2D GetOrCreateTexture(Color color)
+        {
+            if (textureCache.TryGetValue(color, out Texture2D texture))
             {
                 return texture;
             }
-            
+
             texture = new Texture2D(1, 1);
             texture.SetPixel(0, 0, color);
             texture.Apply();
-            _colorToTexture[color] = texture;
-            
+            textureCache[color] = texture;
+
             return texture;
         }
 
-        public static void SetEnabled(bool enabled)
+        /// <summary>
+        /// Clears all caches and forces a refresh.
+        /// </summary>
+        public static void ClearCaches()
         {
-            _isEnabled = enabled;
-        }
+            pathColorCache.Clear();
 
-        public static bool IsEnabled => _isEnabled;
+            // Clean up textures
+            foreach (var texture in textureCache.Values)
+            {
+                if (texture != null)
+                    Object.DestroyImmediate(texture);
+            }
+            textureCache.Clear();
 
-        public static string GetStatistics()
-        {
-            return $"Folders: {_pathToColor.Count} | Textures: {_colorToTexture.Count} | Enabled: {_isEnabled}";
+            EditorApplication.RepaintProjectWindow();
         }
     }
 }

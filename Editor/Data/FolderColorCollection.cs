@@ -3,69 +3,69 @@ using UnityEngine;
 
 namespace SmartFolders.Data
 {
-    [CreateAssetMenu(menuName = "Smart Folders/Folder Color Collection", fileName = "FolderColorCollection")]
+    /// <summary>
+    /// ScriptableObject that stores a collection of folder colors.
+    /// </summary>
+    [CreateAssetMenu(fileName = "FolderColorCollection", menuName = "Smart Folders/Folder Color Collection")]
     public class FolderColorCollection : ScriptableObject
     {
-        [Tooltip("List of folder color configurations")]
-        public List<FolderColor> Data = new List<FolderColor>();
+        [Tooltip("List of folders and their associated colors")]
+        public List<FolderColor> FolderColors = new List<FolderColor>();
 
-        [Header("Settings")]
-        [Tooltip("Auto-reload when this asset is modified")]
-        public bool AutoReload = true;
-
-        [Tooltip("Enable debug logging")]
-        public bool DebugMode = false;
-
-        private void OnValidate()
-        {
-            if (AutoReload)
-            {
-                Core.SmartFolders.ReloadSettings();
-
-                if (DebugMode)
-                {
-                    Debug.Log($"[Smart Folders] Reloaded {Data.Count} folder colors from {name}");
-                }
-            }
-        }
-
+        /// <summary>
+        /// Gets the color for a specific path, or null if no color is defined.
+        /// </summary>
         public Color? GetColorForPath(string path)
         {
-            for (int i = Data.Count - 1; i >= 0; i--)
+            // Check in reverse order so later entries override earlier ones
+            for (int i = FolderColors.Count - 1; i >= 0; i--)
             {
-                var folderColor = Data[i];
+                var folderColor = FolderColors[i];
                 if (folderColor.IsValid() && folderColor.MatchesPath(path))
                 {
                     return folderColor.Color;
                 }
             }
-
             return null;
         }
 
-        public void AddFolder(string path, Color color)
+        /// <summary>
+        /// Adds or updates a folder color entry.
+        /// </summary>
+        public void SetFolderColor(string path, Color color, bool usePattern = false)
         {
-            Data.Add(new FolderColor
+            // Check if entry already exists
+            var existing = FolderColors.Find(fc => fc.Path == path);
+            if (existing != null)
             {
-                Path = path,
-                Color = color
-            });
-        }
-
-        public bool RemoveFolder(string path)
-        {
-            var item = Data.Find(f => f.Path == path);
-            if (item != null)
-            {
-                Data.Remove(item);
-                return true;
+                existing.Color = color;
+                existing.UsePattern = usePattern;
             }
-            return false;
+            else
+            {
+                FolderColors.Add(new FolderColor
+                {
+                    Path = path,
+                    Color = color,
+                    UsePattern = usePattern
+                });
+            }
         }
 
+        /// <summary>
+        /// Removes a folder color entry.
+        /// </summary>
+        public void RemoveFolderColor(string path)
+        {
+            FolderColors.RemoveAll(fc => fc.Path == path);
+        }
+
+        /// <summary>
+        /// Clears all folder colors.
+        /// </summary>
         public void Clear()
         {
-            Data.Clear();
+            FolderColors.Clear();
         }
     }
 }

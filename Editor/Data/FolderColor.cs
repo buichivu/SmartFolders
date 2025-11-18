@@ -19,9 +19,6 @@ namespace SmartFolders.Data
         [Tooltip("Enable pattern matching (e.g., Assets/Scripts/* will match all subfolders)")]
         public bool UsePattern = false;
 
-        [Tooltip("Only apply color in specific theme (leave empty for all themes)")]
-        public string ThemeFilter = "";
-
         /// <summary>
         /// Validates if this folder color configuration is valid.
         /// </summary>
